@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Caelestia
 import Caelestia.Config
 import Caelestia.Models
 import qs.services
@@ -17,13 +18,67 @@ Searcher {
 
     property bool showPreview: false
     readonly property string current: showPreview ? previewPath : actualCurrent
+    readonly property string currentPreview: {
+        if (showPreview)
+            return previewPath;
+        if (isWallpaperEngine) {
+            const match = liveWallpapers.find(w => w.path === actualCurrent);
+            if (match && match.preview)
+                return match.preview;
+            return `${Paths.state}/wallpaper/current`;
+        }
+        return actualCurrent;
+    }
     property string previewPath
     property string actualCurrent
     property bool previewColourLock
     property bool pendingPreviewClear
 
-    function getCategoryFor(w: FileSystemEntry): string {
-        let category = w.parentDir.slice(Paths.wallsdir.length + 1);
+    readonly property bool isWallpaperEngine: GlobalConfig.background?.wallpaperEngine?.enabled ?? false
+    property list<QtObject> liveWallpapers: []
+
+    function reloadLiveWallpapers(): void {
+        liveWallpapers = CUtils.getWorkshopWallpapers(Paths.weWorkshopDir);
+    }
+
+    function initWallpaperEngine(): void {
+        if (isWallpaperEngine) {
+            reloadLiveWallpapers();
+            Quickshell.execDetached(["caelestia", "wallpaper", "-R", ...smartArg]);
+        }
+    }
+
+    onIsWallpaperEngineChanged: initWallpaperEngine()
+    Component.onCompleted: initWallpaperEngine()
+
+    Connections {
+        target: Paths
+        function onWeWorkshopDirChanged() {
+            if (root.isWallpaperEngine)
+                root.reloadLiveWallpapers();
+        }
+    }
+
+    Connections {
+        target: SessionManager
+        function onResumed() {
+            root.initWallpaperEngine();
+        }
+    }
+
+    function previewFor(w: var): string {
+        return w?.preview ?? w?.path ?? "";
+    }
+
+    function titleFor(w: var): string {
+        return w?.title ?? w?.name ?? "";
+    }
+    function getCategoryFor(w: var): string {
+        if (!w)
+            return "";
+        if (isWallpaperEngine)
+            return "Live";
+        let category = (w.parentDir ?? "").slice(Paths.wallsdir.length + 1);
         if (category.includes("/"))
             category = category.slice(0, category.indexOf("/"));
         return category;
@@ -59,7 +114,7 @@ Searcher {
             Colours.showPreview = false;
     }
 
-    list: wallpapers.entries
+    list: isWallpaperEngine ? liveWallpapers : wallpapers.entries
     key: "relativePath"
     useFuzzy: GlobalConfig.launcher.useFuzzy.wallpapers
     extraOpts: useFuzzy ? ({}) : ({
@@ -109,6 +164,17 @@ Searcher {
         recursive: true
         path: Paths.wallsdir
         filter: FileSystemModel.Images
+    }
+
+    FileSystemModel {
+        id: workshopWatcher
+
+        path: Paths.weWorkshopDir
+        filter: FileSystemModel.Dirs
+        onEntriesChanged: {
+            if (root.isWallpaperEngine)
+                root.reloadLiveWallpapers();
+        }
     }
 
     Process {

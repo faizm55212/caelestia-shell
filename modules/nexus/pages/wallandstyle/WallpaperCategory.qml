@@ -34,14 +34,14 @@ PageBase {
             }
 
             WallItem {
-                required property FileSystemEntry modelData
+                required property var modelData
 
                 // Empty placeholders for sizing
                 opacity: modelData ? 1 : 0
-                enabled: modelData
+                enabled: Boolean(modelData)
 
-                source: String(modelData?.path ?? "")
-                text: modelData?.name ?? ""
+                source: Wallpapers.previewFor(modelData)
+                text: Wallpapers.titleFor(modelData)
                 onClicked: {
                     Wallpapers.setWallpaper(modelData.path);
                     root.nState.closeSubPage();

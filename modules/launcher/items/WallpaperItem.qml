@@ -10,7 +10,7 @@ import qs.services
 Item {
     id: root
 
-    required property FileSystemEntry modelData
+    required property var modelData
     required property ScreenState screenState
 
     scale: 0.5
@@ -66,7 +66,7 @@ Item {
 
         CachingImage {
             anchors.fill: parent
-            path: root.modelData.path
+            path: Wallpapers.previewFor(root.modelData)
             smooth: !root.PathView.view.moving
             sourceSize: {
                 const dpr = (QsWindow.window as QsWindow)?.devicePixelRatio ?? 1;
@@ -86,7 +86,7 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
         renderType: Text.QtRendering
-        text: root.modelData.relativePath
+        text: Wallpapers.titleFor(root.modelData)
         font: Tokens.font.label.medium
     }
 

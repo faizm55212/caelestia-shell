@@ -83,7 +83,7 @@ PageBase {
 
         StyledText {
             Layout.topMargin: Tokens.spacing.large
-            text: qsTr("Local wallpapers")
+            text: Wallpapers.isWallpaperEngine ? qsTr("Live wallpapers") : qsTr("Local wallpapers")
             font: Tokens.font.title.small
         }
 
@@ -100,6 +100,13 @@ PageBase {
 
                 model: {
                     const walls = Wallpapers.list;
+                    if (Wallpapers.isWallpaperEngine) {
+                        const list = [...walls];
+                        list.sort((a, b) => (a.title ?? a.name ?? "").localeCompare(b.title ?? b.name ?? ""));
+                        while (list.length < Config.nexus.wallpapersPerRow)
+                            list.push(null);
+                        return list;
+                    }
                     const baseDir = Paths.wallsdir;
                     const categories = {};
                     const list = [];
@@ -120,25 +127,25 @@ PageBase {
                 }
 
                 WallItem {
-                    required property FileSystemEntry modelData
+                    required property var modelData
 
                     // Empty placeholders for sizing
                     opacity: modelData ? 1 : 0
-                    enabled: modelData
+                    enabled: Boolean(modelData)
 
-                    source: String(modelData?.path ?? "")
+                    source: Wallpapers.previewFor(modelData)
                     text: {
                         if (!modelData)
                             return "";
 
-                        if (modelData.parentDir !== Paths.wallsdir) {
+                        if (!Wallpapers.isWallpaperEngine && modelData.parentDir !== Paths.wallsdir) {
                             const category = Wallpapers.getCategoryFor(modelData);
                             return category.slice(0, 1).toUpperCase() + category.slice(1);
                         }
-                        return modelData.name;
+                        return Wallpapers.titleFor(modelData);
                     }
                     onClicked: {
-                        if (modelData.parentDir !== Paths.wallsdir) {
+                        if (!Wallpapers.isWallpaperEngine && modelData.parentDir !== Paths.wallsdir) {
                             root.nState.selectedWallpaperCategory = Wallpapers.getCategoryFor(modelData);
                             root.nState.openSubPage(2); // Category page
                         } else {

@@ -57,8 +57,10 @@ PathView {
     Component.onDestruction: Wallpapers.stopPreview()
 
     onCurrentItemChanged: {
-        if (currentItem)
-            Wallpapers.preview((currentItem as WallpaperItem).modelData.path);
+        if (currentItem && (currentItem as WallpaperItem).modelData) {
+            const data = (currentItem as WallpaperItem).modelData;
+            Wallpapers.preview(Wallpapers.previewFor(data));
+        }
     }
 
     implicitWidth: Math.min(numItems, count) * itemWidth
