@@ -58,50 +58,95 @@ Item {
         topPadding: Math.round((Tokens.padding.medium + Tokens.padding.large) / 2)
         bottomPadding: Math.round((Tokens.padding.medium + Tokens.padding.large) / 2)
 
-        placeholderText: qsTr("Type \"%1\" for commands").arg(GlobalConfig.launcher.actionPrefix)
+        placeholderText: qsTr("Type \"%1\" for commands, \"%2\" for clipboard, \"%3\" for emoji")
+            .arg(GlobalConfig.launcher.actionPrefix)
+            .arg(GlobalConfig.launcher.clipboardPrefix)
+            .arg(GlobalConfig.launcher.emojiPrefix)
 
         onAccepted: {
             const currentItem = list.currentList?.currentItem;
-            if (currentItem) {
-                if (list.showWallpapers) {
+            if (list.showWallpapers) {
+                if (currentItem) {
                     if (Colours.scheme === "dynamic" && currentItem.modelData.path !== Wallpapers.actualCurrent)
                         Wallpapers.previewColourLock = true;
                     Wallpapers.setWallpaper(currentItem.modelData.path);
                     root.screenState.launcher = false;
-                } else if (text.startsWith(GlobalConfig.launcher.actionPrefix)) {
+                }
+            } else if (list.showEmojis) {
+                if (list.currentList?.acceptCurrent)
+                    list.currentList.acceptCurrent();
+                else if (currentItem?.modelData)
+                    Emoji.pasteEmoji(currentItem.modelData.glyph);
+                root.screenState.launcher = false;
+            } else if (text.startsWith(GlobalConfig.launcher.clipboardPrefix)) {
+                if (currentItem?.modelData)
+                    Clipboard.selectItem(currentItem.modelData);
+                root.screenState.launcher = false;
+            } else if (text.startsWith(GlobalConfig.launcher.actionPrefix)) {
+                if (currentItem) {
                     if (text.startsWith(`${GlobalConfig.launcher.actionPrefix}calc `))
                         currentItem.onClicked();
                     else
                         currentItem.modelData.onClicked(list.currentList);
-                } else {
-                    Apps.launch(currentItem.modelData);
-                    root.screenState.launcher = false;
                 }
+            } else if (currentItem?.modelData) {
+                Apps.launch(currentItem.modelData);
+                root.screenState.launcher = false;
             }
         }
 
-        Keys.onUpPressed: list.currentList?.decrementCurrentIndex()
-        Keys.onDownPressed: list.currentList?.incrementCurrentIndex()
+        Keys.onUpPressed: list.moveUp()
+        Keys.onDownPressed: list.moveDown()
+        Keys.onLeftPressed: event => {
+            if (list.showEmojis) {
+                list.moveLeft();
+                event.accepted = true;
+            }
+        }
+        Keys.onRightPressed: event => {
+            if (list.showEmojis) {
+                list.moveRight();
+                event.accepted = true;
+            }
+        }
 
         Keys.onEscapePressed: root.screenState.launcher = false
 
         Keys.onPressed: event => {
+            if (event.key === Qt.Key_Delete && search.text.startsWith(GlobalConfig.launcher.clipboardPrefix)) {
+                if (event.modifiers & Qt.ShiftModifier) {
+                    Clipboard.wipeAll();
+                } else {
+                    const currentItem = list.currentList?.currentItem;
+                    if (currentItem?.modelData)
+                        Clipboard.deleteItem(currentItem.modelData);
+                }
+                event.accepted = true;
+                return;
+            }
+
             if (!GlobalConfig.launcher.vimKeybinds)
                 return;
 
             if (event.modifiers & Qt.ControlModifier) {
                 if (event.key === Qt.Key_J || event.key === Qt.Key_N) {
-                    list.currentList?.incrementCurrentIndex();
+                    list.moveDown();
                     event.accepted = true;
                 } else if (event.key === Qt.Key_K || event.key === Qt.Key_P) {
-                    list.currentList?.decrementCurrentIndex();
+                    list.moveUp();
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_H && list.showEmojis) {
+                    list.moveLeft();
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_L && list.showEmojis) {
+                    list.moveRight();
                     event.accepted = true;
                 }
             } else if (event.key === Qt.Key_Tab) {
-                list.currentList?.incrementCurrentIndex();
+                list.moveRight();
                 event.accepted = true;
             } else if (event.key === Qt.Key_Backtab || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier))) {
-                list.currentList?.decrementCurrentIndex();
+                list.moveLeft();
                 event.accepted = true;
             }
         }

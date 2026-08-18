@@ -19,8 +19,37 @@ Item {
     required property int rounding
 
     readonly property bool showWallpapers: search.text.startsWith(`${GlobalConfig.launcher.actionPrefix}wallpaper `)
-    readonly property var currentList: showWallpapers ? wallpaperList.item : appList.item // Can be either ListView or PathView, so can't type properly
-    property string animState: showWallpapers ? "wallpapers" : "apps"
+    readonly property bool showEmojis: search.text.startsWith(GlobalConfig.launcher.emojiPrefix)
+    readonly property var currentList: showWallpapers ? wallpaperList.item : (showEmojis ? emojiList.item : appList.item) // Can be either ListView, GridView or PathView, so can't type properly
+    property string animState: showWallpapers ? "wallpapers" : (showEmojis ? "emojis" : "apps")
+
+    function moveUp(): void {
+        if (showEmojis && currentList?.moveUp)
+            currentList.moveUp();
+        else
+            currentList?.decrementCurrentIndex();
+    }
+
+    function moveDown(): void {
+        if (showEmojis && currentList?.moveDown)
+            currentList.moveDown();
+        else
+            currentList?.incrementCurrentIndex();
+    }
+
+    function moveLeft(): void {
+        if (showEmojis && currentList?.moveLeft)
+            currentList.moveLeft();
+        else
+            currentList?.decrementCurrentIndex();
+    }
+
+    function moveRight(): void {
+        if (showEmojis && currentList?.moveRight)
+            currentList.moveRight();
+        else
+            currentList?.incrementCurrentIndex();
+    }
 
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.bottom: parent.bottom
@@ -50,6 +79,20 @@ Item {
                 root.implicitWidth: Math.max(root.Tokens.sizes.launcher.itemWidth * 1.2, wallpaperList.implicitWidth)
                 root.implicitHeight: root.Tokens.sizes.launcher.wallpaperHeight
                 wallpaperList.active: true
+            }
+        },
+        State {
+            name: "emojis"
+
+            PropertyChanges {
+                root.implicitWidth: root.Tokens.sizes.launcher.itemWidth
+                root.implicitHeight: Math.min(root.maxHeight, emojiList.implicitHeight > 0 ? emojiList.implicitHeight : empty.implicitHeight)
+                emojiList.active: true
+            }
+
+            AnchorChanges {
+                anchors.left: root.parent.left
+                anchors.right: root.parent.right
             }
         }
     ]
@@ -109,6 +152,22 @@ Item {
         }
     }
 
+    Loader {
+        id: emojiList
+
+        active: false
+
+        anchors.fill: parent
+
+        sourceComponent: EmojiList {
+            objectName: "launcherEmojiList"
+
+            search: root.search
+            screenState: root.screenState
+            maxHeight: root.maxHeight
+        }
+    }
+
     Row {
         id: empty
 
@@ -122,7 +181,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
 
         MaterialIcon {
-            text: root.state === "wallpapers" ? "wallpaper_slideshow" : "manage_search"
+            text: root.state === "wallpapers" ? "wallpaper_slideshow" : (root.state === "emojis" ? "sentiment_satisfied" : (root.search.text.startsWith(GlobalConfig.launcher.clipboardPrefix) ? "content_paste_off" : "manage_search"))
             color: Colours.palette.m3onSurfaceVariant
             fontStyle: Tokens.font.icon.extraLarge
 
@@ -133,13 +192,25 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
 
             StyledText {
-                text: root.state === "wallpapers" ? qsTr("No wallpapers found") : qsTr("No results")
+                text: {
+                    if (root.state === "wallpapers")
+                        return qsTr("No wallpapers found");
+                    if (root.state === "emojis")
+                        return qsTr("No emojis found");
+                    if (root.search.text.startsWith(GlobalConfig.launcher.clipboardPrefix))
+                        return qsTr("Clipboard history is empty");
+                    return qsTr("No results");
+                }
                 color: Colours.palette.m3onSurfaceVariant
                 font: Tokens.font.body.builders.large.weight(Font.Medium).build()
             }
 
             StyledText {
-                text: root.state === "wallpapers" && Wallpapers.list.length === 0 ? qsTr("Try putting some wallpapers in %1").arg(Paths.shortenHome(Paths.wallsdir)) : qsTr("Try searching for something else")
+                text: {
+                    if (root.state === "wallpapers" && Wallpapers.list.length === 0)
+                        return qsTr("Try putting some wallpapers in %1").arg(Paths.shortenHome(Paths.wallsdir));
+                    return qsTr("Try searching for something else");
+                }
                 color: Colours.palette.m3onSurfaceVariant
                 font: Tokens.font.body.medium
             }
