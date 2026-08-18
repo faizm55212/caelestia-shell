@@ -36,6 +36,9 @@ StyledListView {
             return "actions";
         }
 
+        if (text.startsWith(GlobalConfig.launcher.clipboardPrefix))
+            return "clipboard";
+
         return "apps";
     }
 
@@ -49,6 +52,8 @@ StyledListView {
             return Schemes.query(text);
         case "variant":
             return M3Variants.query(text);
+        case "clipboard":
+            return Clipboard.query(text);
         default:
             return Apps.search(text);
         }
@@ -87,6 +92,8 @@ StyledListView {
     onStateChanged: {
         if (state === "scheme" || state === "variant")
             Schemes.reload();
+        else if (state === "clipboard")
+            Clipboard.reload();
     }
 
     Component.onCompleted: displayText = search.text
@@ -125,6 +132,13 @@ StyledListView {
 
             PropertyChanges {
                 root.delegate: variantItem
+            }
+        },
+        State {
+            name: "clipboard"
+
+            PropertyChanges {
+                root.delegate: clipboardItem
             }
         }
     ]
@@ -283,6 +297,14 @@ StyledListView {
         id: variantItem
 
         VariantItem {
+            list: root
+        }
+    }
+
+    Component {
+        id: clipboardItem
+
+        ClipboardItem {
             list: root
         }
     }

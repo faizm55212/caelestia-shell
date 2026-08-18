@@ -37,11 +37,10 @@ Singleton {
     function query(search: string): var {
         search = transformSearch(search.trim().replace(/\s+/g, " "));
         if (!search)
-            return [...list];
+            return extraOpts.limit ? list.slice(0, extraOpts.limit) : [...list];
 
         if (useFuzzy)
             return Fuzzy.go(search, fuzzyPrepped, Object.assign({
-                all: true,
                 keys,
                 scoreFn: r => weights.reduce((a, w, i) => a + r[i].score * w, 0)
             }, extraOpts)).map(r => r.obj._item);

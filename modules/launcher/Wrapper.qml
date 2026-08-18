@@ -25,10 +25,13 @@ Item {
     property real offsetScale: shouldBeActive ? 0 : 1
 
     onShouldBeActiveChanged: {
-        if (shouldBeActive)
+        if (shouldBeActive) {
             implicitHeight = Qt.binding(() => content.implicitHeight);
-        else
+            Clipboard.reload();
+            Emoji.ensureLoaded();
+        } else {
             implicitHeight = implicitHeight; // Break binding during close anim
+        }
     }
 
     visible: offsetScale < 1
@@ -37,7 +40,7 @@ Item {
     implicitWidth: content.implicitWidth || 630 // Hard coded fallback for first open
     opacity: 1 - offsetScale
 
-    Component.onCompleted: Qt.callLater(() => Apps) // Load apps on init
+    Component.onCompleted: Qt.callLater(() => Apps)
 
     Behavior on offsetScale {
         Anim {}
