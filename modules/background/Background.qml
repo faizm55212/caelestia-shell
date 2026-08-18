@@ -16,11 +16,13 @@ Variants {
 
         required property ShellScreen modelData
 
+        readonly property bool useWallpaperEngine: contentItem.Config.background.wallpaperEngine.enabled
+
         screen: modelData
         name: "background"
         WlrLayershell.exclusionMode: ExclusionMode.Ignore
-        WlrLayershell.layer: contentItem.Config.background.wallpaperEnabled ? WlrLayer.Background : WlrLayer.Bottom
-        color: contentItem.Config.background.wallpaperEnabled ? "black" : "transparent"
+        WlrLayershell.layer: contentItem.Config.background.wallpaperEnabled && !useWallpaperEngine ? WlrLayer.Background : WlrLayer.Bottom
+        color: contentItem.Config.background.wallpaperEnabled && !useWallpaperEngine ? "black" : "transparent"
         surfaceFormat.opaque: false
 
         anchors.top: true
@@ -45,7 +47,7 @@ Variants {
                 asynchronous: true
 
                 anchors.fill: parent
-                active: Config.background.wallpaperEnabled
+                active: Config.background.wallpaperEnabled && !win.useWallpaperEngine
 
                 sourceComponent: Wallpaper {}
             }

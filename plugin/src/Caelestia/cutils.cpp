@@ -1,7 +1,11 @@
 #include "cutils.hpp"
 
 #include <qdir.h>
+#include <qfile.h>
 #include <qfileinfo.h>
+#include <qfuturewatcher.h>
+#include <qjsondocument.h>
+#include <qjsonobject.h>
 #include <qloggingcategory.h>
 #include <qmetaobject.h>
 #include <qqmlengine.h>
@@ -9,6 +13,7 @@
 #include <qquickwindow.h>
 #include <qregularexpression.h>
 #include <qtconcurrentrun.h>
+#include <qvariant.h>
 
 #include "util/metaenum.hpp"
 
@@ -19,6 +24,8 @@ Q_LOGGING_CATEGORY(lcCUtils, "caelestia.cutils", QtInfoMsg)
 } // namespace
 
 namespace caelestia {
+
+using Qt::StringLiterals::operator""_s;
 
 void CUtils::saveItem(QQuickItem* target, const QUrl& path, const QJSValue& onSaved, const QJSValue& onFailed) {
     this->saveItem(target, path, QRect(), onSaved, onFailed);
@@ -110,6 +117,10 @@ QString CUtils::toLocalFile(const QUrl& url) {
     }
 
     return url.toLocalFile();
+}
+
+bool CUtils::dirExists(const QString& path) {
+    return QFileInfo(path).isDir();
 }
 
 qreal CUtils::clamp(qreal value, qreal min, qreal max) {
@@ -212,6 +223,67 @@ QList<QQuickItem*> CUtils::findChildrenMatching(QQuickItem* root, const QString&
             children);
     }
     return children;
+}
+
+QList<QObject*> CUtils::getWorkshopWallpapers(const QString& workshopDir) {
+    QList<QObject*> list;
+    QDir dir(workshopDir);
+    if (!dir.exists()) {
+        return list;
+    }
+
+    const auto subdirs = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const auto& info : subdirs) {
+        QDir subDir(info.absoluteFilePath());
+        QString previewPath;
+        const QStringList candidatePreviews = { u"preview.jpg"_s, u"preview.png"_s,
+            u"thumbnail.jpg"_s, u"thumbnail.png"_s, u"preview.webp"_s,
+            u"thumbnail.webp"_s, u"preview.gif"_s, u"thumbnail.gif"_s };
+
+        for (const auto& cand : candidatePreviews) {
+            if (subDir.exists(cand)) {
+                previewPath = subDir.absoluteFilePath(cand);
+                break;
+            }
+        }
+
+        if (previewPath.isEmpty()) {
+            const auto imgFiles = subDir.entryInfoList(
+                { u"*.jpg"_s, u"*.png"_s, u"*.webp"_s, u"*.gif"_s },
+                QDir::Files);
+            if (!imgFiles.isEmpty()) {
+                previewPath = imgFiles.first().absoluteFilePath();
+            }
+        }
+
+        if (previewPath.isEmpty()) {
+            continue;
+        }
+
+        QString title = info.fileName();
+        if (subDir.exists(u"project.json"_s)) {
+            QFile projFile(subDir.absoluteFilePath(u"project.json"_s));
+            if (projFile.open(QIODevice::ReadOnly)) {
+                QJsonParseError err{};
+                const auto doc = QJsonDocument::fromJson(projFile.readAll(), &err);
+                if (err.error == QJsonParseError::NoError && doc.isObject()) {
+                    const auto obj = doc.object();
+                    if (obj.contains(u"title"_s)) {
+                        const auto t = obj.value(u"title"_s).toString().trimmed();
+                        if (!t.isEmpty()) {
+                            title = t;
+                        }
+                    }
+                }
+            }
+        }
+
+        auto* entry =
+            new WorkshopEntry(info.absoluteFilePath(), previewPath, title, workshopDir, info.fileName(), this);
+        list.append(entry);
+    }
+
+    return list;
 }
 
 #ifndef CAELESTIA_VERSION
