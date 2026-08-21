@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "imagecacher.hpp"
+#include "iutils.hpp"
 
 namespace {
 
@@ -81,7 +82,7 @@ void CachingImageResponse::process() {
     // If both dimensions are missing, return the original directly
     if (needsW && needsH) {
         qCDebug(lcCProv).noquote() << "Given source size is invalid, returning original:" << path;
-        m_image = QImage(path);
+        m_image = readSourceImage(path);
         if (m_image.isNull()) {
             m_error = u"Failed to decode source: "_s + path;
             qCWarning(lcCProv).noquote() << m_error;
@@ -119,7 +120,7 @@ void CachingImageResponse::process() {
     // Schedule cache job (this call will return the original image, but later ones will use cache)
     ImageCacher::instance()->schedule(path, cachePath, size, m_fillMode);
 
-    m_image = QImage(path);
+    m_image = readSourceImage(path);
     if (m_image.isNull()) {
         m_error = u"Failed to decode source: "_s + path;
         qCWarning(lcCProv).noquote() << m_error;

@@ -1,10 +1,12 @@
 #include "imagecacher.hpp"
+#include "iutils.hpp"
 
 #include <qcryptographichash.h>
 #include <qdir.h>
 #include <qfile.h>
 #include <qfileinfo.h>
 #include <qimage.h>
+#include <qimagereader.h>
 #include <qloggingcategory.h>
 #include <qmutex.h>
 #include <qpainter.h>
@@ -107,7 +109,7 @@ void ImageCacher::runJob(const QString& sourcePath, const QString& cachePath, co
         return;
     }
 
-    QImage image(sourcePath);
+    QImage image = readSourceImage(sourcePath);
     if (image.isNull()) {
         qCWarning(lcCacher).noquote() << "Failed to decode source" << sourcePath;
         return;

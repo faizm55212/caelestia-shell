@@ -1,10 +1,30 @@
 #include "iutils.hpp"
 
+#include <qimagereader.h>
+
 #include "cachingimageprovider.hpp"
 
 namespace caelestia::images {
 
 using Qt::StringLiterals::operator""_s;
+
+QImage readSourceImage(const QString& path) {
+    QImageReader reader(path);
+    if (reader.supportsAnimation()) {
+        const int count = reader.imageCount();
+        const int target = count > 1 ? std::min(count / 2, 5) : 0;
+        QImage img;
+        for (int i = 0; i <= target; ++i) {
+            const QImage next = reader.read();
+            if (next.isNull())
+                break;
+            img = next;
+        }
+        if (!img.isNull())
+            return img;
+    }
+    return reader.read();
+}
 
 IUtils::IUtils(QObject* parent)
     : QObject(parent) {}

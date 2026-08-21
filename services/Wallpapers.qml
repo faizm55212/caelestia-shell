@@ -6,6 +6,7 @@ import Quickshell.Io
 import Caelestia
 import Caelestia.Config
 import Caelestia.Models
+import Caelestia.Services
 import qs.services
 import qs.utils
 
@@ -17,18 +18,7 @@ Searcher {
     readonly property string fallback: Quickshell.shellPath("assets/wallpaper.webp")
 
     property bool showPreview: false
-    readonly property string current: showPreview ? previewPath : actualCurrent
-    readonly property string currentPreview: {
-        if (showPreview)
-            return previewPath;
-        if (isWallpaperEngine) {
-            const match = liveWallpapers.find(w => w.path === actualCurrent);
-            if (match && match.preview)
-                return match.preview;
-            return `${Paths.state}/wallpaper/current`;
-        }
-        return actualCurrent;
-    }
+    readonly property string current: showPreview ? previewPath : (liveWallpapers.find(w => w.path === actualCurrent)?.preview ?? actualCurrent)
     property string previewPath
     property string actualCurrent
     property bool previewColourLock
