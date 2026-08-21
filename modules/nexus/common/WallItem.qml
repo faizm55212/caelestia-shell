@@ -6,12 +6,13 @@ import Quickshell
 import Caelestia.Config
 import qs.components
 import qs.components.controls
+import qs.components.images
 import qs.services
 
 Item {
     id: root
 
-    property alias source: img.source
+    property string source
     property alias text: label.text
     property alias radius: imgWrapper.radius
     property alias imgHeight: imgWrapper.implicitHeight
@@ -65,15 +66,15 @@ Item {
                 }
             }
 
-            Image {
+            CachingImage {
                 id: img
 
                 anchors.fill: parent
-                asynchronous: true
-                fillMode: Image.PreserveAspectCrop
+                path: root.source
+                smooth: true
                 sourceSize: {
                     const dpr = (QsWindow.window as QsWindow)?.devicePixelRatio ?? 1;
-                    return Qt.size(width * dpr, height * dpr);
+                    return Qt.size(imgWrapper.width * dpr, imgWrapper.height * dpr);
                 }
                 retainWhileLoading: true
                 opacity: status === Image.Ready ? 1 : 0

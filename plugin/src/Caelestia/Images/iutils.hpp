@@ -1,5 +1,6 @@
 #pragma once
 
+#include <qimage.h>
 #include <qjsengine.h>
 #include <qobject.h>
 #include <qqmlengine.h>
@@ -7,6 +8,8 @@
 #include <qurl.h>
 
 namespace caelestia::images {
+
+QImage readSourceImage(const QString& path);
 
 class IUtils : public QObject {
     Q_OBJECT
