@@ -18,17 +18,36 @@ Searcher {
     readonly property string fallback: Quickshell.shellPath("assets/wallpaper.webp")
 
     property bool showPreview: false
-    readonly property string current: showPreview ? previewPath : (liveWallpapers.find(w => w.path === actualCurrent)?.preview ?? actualCurrent)
+    readonly property string current: showPreview ? previewPath : actualCurrentPreview
     property string previewPath
     property string actualCurrent
+    property string actualCurrentPreview: actualCurrent
     property bool previewColourLock
     property bool pendingPreviewClear
 
     readonly property bool isWallpaperEngine: GlobalConfig.background?.wallpaperEngine?.enabled ?? false
-    property list<QtObject> liveWallpapers: []
+    property list<WorkshopEntry> liveWallpapers: []
+
+    function updateActualCurrentPreview(): void {
+        if (isWallpaperEngine) {
+            const found = liveWallpapers.find(w => w.path === actualCurrent);
+            if (found && found.preview) {
+                actualCurrentPreview = found.preview;
+            } else if (actualCurrent) {
+                actualCurrentPreview = `${Paths.state}/wallpaper/current`;
+            } else {
+                actualCurrentPreview = actualCurrent;
+            }
+        } else {
+            actualCurrentPreview = actualCurrent;
+        }
+    }
+
+    onActualCurrentChanged: updateActualCurrentPreview()
+    onLiveWallpapersChanged: updateActualCurrentPreview()
 
     function reloadLiveWallpapers(): void {
-        liveWallpapers = CUtils.getWorkshopWallpapers(Paths.weWorkshopDir);
+        CUtils.reloadWorkshopWallpapers(Paths.weWorkshopDir);
     }
 
     function initWallpaperEngine(): void {
@@ -38,8 +57,18 @@ Searcher {
         }
     }
 
-    onIsWallpaperEngineChanged: initWallpaperEngine()
+    onIsWallpaperEngineChanged: {
+        updateActualCurrentPreview();
+        initWallpaperEngine();
+    }
     Component.onCompleted: initWallpaperEngine()
+
+    Connections {
+        target: CUtils
+        function onWorkshopWallpapersLoaded(wallpapers) {
+            root.liveWallpapers = wallpapers;
+        }
+    }
 
     Connections {
         target: Paths

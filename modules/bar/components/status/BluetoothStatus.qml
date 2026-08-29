@@ -43,7 +43,7 @@ Item {
         // Connected bluetooth devices
         Repeater {
             model: ScriptModel {
-                values: Bluetooth.devices.values.filter(d => d.state !== BluetoothDeviceState.Disconnected) // qmllint disable unresolved-type
+                values: root.Config.bar.bluetooth.showDevices ? Bluetooth.devices.values.filter(d => d.state !== BluetoothDeviceState.Disconnected) : [] // qmllint disable unresolved-type
             }
 
             MaterialIcon {

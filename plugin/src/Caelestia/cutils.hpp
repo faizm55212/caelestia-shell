@@ -1,5 +1,6 @@
 #pragma once
 
+#include <qfuturewatcher.h>
 #include <qlist.h>
 #include <qobject.h>
 #include <qqmlintegration.h>
@@ -7,6 +8,14 @@
 #include <qvariant.h>
 
 namespace caelestia {
+
+struct RawWorkshopEntry {
+    QString path;
+    QString preview;
+    QString title;
+    QString workshopDir;
+    QString id;
+};
 
 class WorkshopEntry : public QObject {
     Q_OBJECT
@@ -63,8 +72,12 @@ class CUtils : public QObject {
 
     Q_PROPERTY(QString version READ version CONSTANT)
     Q_PROPERTY(QString qtVersion READ qtVersion CONSTANT)
+    Q_PROPERTY(QList<WorkshopEntry*> workshopWallpapers READ workshopWallpapers NOTIFY workshopWallpapersChanged)
 
 public:
+    explicit CUtils(QObject* parent = nullptr);
+    ~CUtils() override;
+
     Q_INVOKABLE void saveItem(
         QQuickItem* target, const QUrl& path, const QJSValue& onSaved = {}, const QJSValue& onFailed = {});
     Q_INVOKABLE void saveItem(QQuickItem* target, const QUrl& path, const QRect& rect, const QJSValue& onSaved = {},
@@ -83,10 +96,22 @@ public:
     Q_INVOKABLE static QList<QQuickItem*> findChildren(QQuickItem* root, const QString& name);
     Q_INVOKABLE static QList<QQuickItem*> findChildrenMatching(QQuickItem* root, const QString& pattern);
 
-    Q_INVOKABLE QList<QObject*> getWorkshopWallpapers(const QString& workshopDir);
+    Q_INVOKABLE void reloadWorkshopWallpapers(const QString& workshopDir);
 
+    [[nodiscard]] QList<WorkshopEntry*> workshopWallpapers() const { return m_workshopWallpapers; }
     [[nodiscard]] static QString version();
     [[nodiscard]] static QString qtVersion();
+
+signals:
+    void workshopWallpapersChanged();
+    void workshopWallpapersLoaded(const QList<WorkshopEntry*>& wallpapers);
+
+private:
+    void setWorkshopWallpapersFromRaw(const QList<RawWorkshopEntry>& rawEntries);
+
+    QList<WorkshopEntry*> m_workshopWallpapers;
+    QFutureWatcher<QList<RawWorkshopEntry>>* m_workshopWatcher = nullptr;
+    QString m_pendingWorkshopDir;
 };
 
 } // namespace caelestia
