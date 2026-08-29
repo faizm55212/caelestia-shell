@@ -8,12 +8,15 @@
 #include <qjsonobject.h>
 #include <qloggingcategory.h>
 #include <qmetaobject.h>
+#include <qpromise.h>
 #include <qqmlengine.h>
 #include <qquickitemgrabresult.h>
 #include <qquickwindow.h>
 #include <qregularexpression.h>
 #include <qtconcurrentrun.h>
 #include <qvariant.h>
+
+#include <functional>
 
 #include "util/metaenum.hpp"
 
@@ -26,6 +29,44 @@ Q_LOGGING_CATEGORY(lcCUtils, "caelestia.cutils", QtInfoMsg)
 namespace caelestia {
 
 using Qt::StringLiterals::operator""_s;
+
+CUtils::CUtils(QObject* parent)
+    : QObject(parent)
+    , m_workshopWatcher(new QFutureWatcher<QList<RawWorkshopEntry>>(this)) {
+    connect(m_workshopWatcher, &QFutureWatcher<QList<RawWorkshopEntry>>::finished, this, [this]() {
+        if (m_workshopWatcher->isCanceled()) {
+            if (!m_pendingWorkshopDir.isEmpty()) {
+                const QString nextDir = m_pendingWorkshopDir;
+                m_pendingWorkshopDir.clear();
+                reloadWorkshopWallpapers(nextDir);
+            }
+            return;
+        }
+
+        const auto rawEntries = m_workshopWatcher->result();
+        setWorkshopWallpapersFromRaw(rawEntries);
+
+        if (!m_pendingWorkshopDir.isEmpty()) {
+            const QString nextDir = m_pendingWorkshopDir;
+            m_pendingWorkshopDir.clear();
+            reloadWorkshopWallpapers(nextDir);
+        }
+    });
+}
+
+CUtils::~CUtils() {
+    if (m_workshopWatcher) {
+        QObject::disconnect(m_workshopWatcher, nullptr, this, nullptr);
+        if (m_workshopWatcher->isRunning()) {
+            m_workshopWatcher->cancel();
+            m_workshopWatcher->waitForFinished();
+        }
+    }
+    for (auto* entry : m_workshopWallpapers) {
+        delete entry;
+    }
+    m_workshopWallpapers.clear();
+}
 
 void CUtils::saveItem(QQuickItem* target, const QUrl& path, const QJSValue& onSaved, const QJSValue& onFailed) {
     this->saveItem(target, path, QRect(), onSaved, onFailed);
@@ -225,20 +266,29 @@ QList<QQuickItem*> CUtils::findChildrenMatching(QQuickItem* root, const QString&
     return children;
 }
 
-QList<QObject*> CUtils::getWorkshopWallpapers(const QString& workshopDir) {
-    QList<QObject*> list;
+static QList<RawWorkshopEntry> scanWorkshopDirectory(
+    const QString& workshopDir, const std::function<bool()>& isCanceled = nullptr) {
+    QList<RawWorkshopEntry> list;
     QDir dir(workshopDir);
     if (!dir.exists()) {
         return list;
     }
 
+    static const QStringList candidatePreviews = { u"preview.jpg"_s, u"preview.png"_s,
+        u"thumbnail.jpg"_s, u"thumbnail.png"_s, u"preview.webp"_s,
+        u"thumbnail.webp"_s, u"preview.gif"_s, u"thumbnail.gif"_s };
+
+    static const QStringList imageFilters = { u"*.jpg"_s, u"*.png"_s,
+        u"*.webp"_s, u"*.gif"_s };
+
     const auto subdirs = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
     for (const auto& info : subdirs) {
+        if (isCanceled && isCanceled()) {
+            return {};
+        }
+
         QDir subDir(info.absoluteFilePath());
         QString previewPath;
-        const QStringList candidatePreviews = { u"preview.jpg"_s, u"preview.png"_s,
-            u"thumbnail.jpg"_s, u"thumbnail.png"_s, u"preview.webp"_s,
-            u"thumbnail.webp"_s, u"preview.gif"_s, u"thumbnail.gif"_s };
 
         for (const auto& cand : candidatePreviews) {
             if (subDir.exists(cand)) {
@@ -248,9 +298,7 @@ QList<QObject*> CUtils::getWorkshopWallpapers(const QString& workshopDir) {
         }
 
         if (previewPath.isEmpty()) {
-            const auto imgFiles = subDir.entryInfoList(
-                { u"*.jpg"_s, u"*.png"_s, u"*.webp"_s, u"*.gif"_s },
-                QDir::Files);
+            const auto imgFiles = subDir.entryInfoList(imageFilters, QDir::Files);
             if (!imgFiles.isEmpty()) {
                 previewPath = imgFiles.first().absoluteFilePath();
             }
@@ -278,12 +326,55 @@ QList<QObject*> CUtils::getWorkshopWallpapers(const QString& workshopDir) {
             }
         }
 
-        auto* entry =
-            new WorkshopEntry(info.absoluteFilePath(), previewPath, title, workshopDir, info.fileName(), this);
-        list.append(entry);
+        list.append(RawWorkshopEntry{
+            info.absoluteFilePath(),
+            previewPath,
+            title,
+            workshopDir,
+            info.fileName()
+        });
     }
 
     return list;
+}
+
+void CUtils::setWorkshopWallpapersFromRaw(const QList<RawWorkshopEntry>& rawEntries) {
+    for (auto* oldEntry : m_workshopWallpapers) {
+        oldEntry->deleteLater();
+    }
+    m_workshopWallpapers.clear();
+
+    m_workshopWallpapers.reserve(rawEntries.size());
+    for (const auto& raw : rawEntries) {
+        m_workshopWallpapers.append(
+            new WorkshopEntry(raw.path, raw.preview, raw.title, raw.workshopDir, raw.id, this));
+    }
+
+    emit workshopWallpapersChanged();
+    emit workshopWallpapersLoaded(m_workshopWallpapers);
+}
+
+void CUtils::reloadWorkshopWallpapers(const QString& workshopDir) {
+    if (workshopDir.isEmpty()) {
+        setWorkshopWallpapersFromRaw({});
+        return;
+    }
+
+    if (m_workshopWatcher->isRunning()) {
+        m_pendingWorkshopDir = workshopDir;
+        m_workshopWatcher->cancel();
+        return;
+    }
+
+    m_pendingWorkshopDir.clear();
+    m_workshopWatcher->setFuture(QtConcurrent::run([workshopDir](QPromise<QList<RawWorkshopEntry>>& promise) {
+        auto result = scanWorkshopDirectory(workshopDir, [&promise]() {
+            return promise.isCanceled();
+        });
+        if (!promise.isCanceled()) {
+            promise.addResult(result);
+        }
+    }));
 }
 
 #ifndef CAELESTIA_VERSION

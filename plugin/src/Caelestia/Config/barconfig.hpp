@@ -103,6 +103,12 @@ class BarClock : public settings::ObjectNode {
     CONFIG_PROPERTY(bool, showSeconds, false)
 };
 
+class BarBluetooth : public settings::ObjectNode {
+    CONFIG_NODE(BarBluetooth, settings::ObjectNode)
+
+    CONFIG_PROPERTY(bool, showDevices, true)
+};
+
 class BarConfig : public settings::ObjectNode {
     CONFIG_NODE(BarConfig, settings::ObjectNode)
 
@@ -115,6 +121,7 @@ class BarConfig : public settings::ObjectNode {
     CONFIG_SUBOBJECT(BarActiveWindow, activeWindow)
     CONFIG_SUBOBJECT(BarTray, tray)
     CONFIG_SUBOBJECT(BarClock, clock)
+    CONFIG_SUBOBJECT(BarBluetooth, bluetooth)
     CONFIG_LIST(EntryList, statusIcons,
         DEFAULT_ARG({
             LIST_ENTRY(lockStatus, true),
